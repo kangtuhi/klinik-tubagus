@@ -27,11 +27,6 @@ if ($id === false || $id === null) {
     exit('ID user tidak valid.');
 }
 
-if ((int) $id === (int) ($currentUser['id'] ?? 0)) {
-    http_response_code(403);
-    exit('Anda tidak dapat menghapus akun yang sedang digunakan.');
-}
-
 $statement = $pdo->prepare(
     'SELECT u.id, u.name, r.slug AS role_slug
      FROM users u
@@ -47,9 +42,15 @@ if (!$user) {
     exit('User tidak ditemukan.');
 }
 
+// Keep the security rules explicit and deterministic.
 if ($user['role_slug'] === 'owner') {
     http_response_code(403);
     exit('Owner utama tidak dapat dihapus.');
+}
+
+if ((int) $id === (int) ($currentUser['id'] ?? 0)) {
+    http_response_code(403);
+    exit('Anda tidak dapat menghapus akun yang sedang digunakan.');
 }
 
 try {
