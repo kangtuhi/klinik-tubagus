@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../app/core/Auth.php';
 require_once __DIR__ . '/../../../app/core/Database.php';
 require_once __DIR__ . '/../../../app/helpers/auth.php';
 require_once __DIR__ . '/../../../app/helpers/permission.php';
+require_once __DIR__ . '/../../../app/helpers/csrf.php';
 
 require_permission('users.view');
 
@@ -18,6 +19,7 @@ $statement = $pdo->query(
 );
 $users = $statement->fetchAll();
 $currentUser = current_user();
+$csrf = csrf_token();
 ?>
 <!doctype html>
 <html lang="id">
@@ -87,11 +89,7 @@ $currentUser = current_user();
 
         <div class="table-wrap">
             <table>
-                <thead>
-                    <tr>
-                        <th>ID</th><th>Nama</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Aksi</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>ID</th><th>Nama</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead>
                 <tbody>
                 <?php foreach ($users as $user): ?>
                     <?php $isCurrent = (int) $user['id'] === (int) $currentUser['id']; ?>
@@ -113,17 +111,20 @@ $currentUser = current_user();
                                         <a href="/dashboard/users/edit.php?id=<?= (int) $user['id'] ?>">Edit</a>
                                         <?php if ($user['status'] === 'active'): ?>
                                             <form class="inline" method="post" action="/dashboard/users/action.php" onsubmit="return confirm('Nonaktifkan user ini? User tidak akan dapat login sampai diaktifkan kembali.');">
+                                                <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
                                                 <input type="hidden" name="action" value="deactivate">
                                                 <button class="action deactivate" type="submit">Nonaktifkan</button>
                                             </form>
                                             <form class="inline" method="post" action="/dashboard/users/action.php" onsubmit="return confirm('Suspend user ini?');">
+                                                <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
                                                 <input type="hidden" name="action" value="suspend">
                                                 <button class="action suspend" type="submit">Suspend</button>
                                             </form>
                                         <?php else: ?>
                                             <form class="inline" method="post" action="/dashboard/users/action.php" onsubmit="return confirm('Aktifkan kembali user ini?');">
+                                                <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>">
                                                 <input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
                                                 <input type="hidden" name="action" value="activate">
                                                 <button class="action activate" type="submit">Aktifkan</button>
@@ -135,9 +136,7 @@ $currentUser = current_user();
                         </td>
                     </tr>
                 <?php endforeach; ?>
-                <?php if (!$users): ?>
-                    <tr><td colspan="7">Belum ada user.</td></tr>
-                <?php endif; ?>
+                <?php if (!$users): ?><tr><td colspan="7">Belum ada user.</td></tr><?php endif; ?>
                 </tbody>
             </table>
         </div>
