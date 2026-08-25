@@ -75,13 +75,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
-        $duplicate = $pdo->prepare(
-            'SELECT username, email FROM users WHERE username = :username OR (:email <> "" AND email = :email) LIMIT 1'
-        );
-        $duplicate->execute([
-            'username' => $username,
-            'email' => $email,
-        ]);
+        // Gunakan placeholder berbeda karena PDO MySQL dengan native prepares
+        // tidak aman untuk memakai named placeholder yang sama lebih dari sekali.
+        if ($email !== '') {
+            $duplicate = $pdo->prepare(
+                'SELECT username, email FROM users
+                 WHERE username = :username OR email = :email
+                 LIMIT 1'
+            );
+            $duplicate->execute([
+                'username' => $username,
+                'email' => $email,
+            ]);
+        } else {
+            $duplicate = $pdo->prepare(
+                'SELECT username, email FROM users
+                 WHERE username = :username
+                 LIMIT 1'
+            );
+            $duplicate->execute(['username' => $username]);
+        }
+
         $existing = $duplicate->fetch();
 
         if ($existing) {
