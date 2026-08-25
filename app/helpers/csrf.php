@@ -32,6 +32,7 @@ function verify_csrf(): void
 
     if ($sessionToken === '' || $submittedToken === '' || !hash_equals($sessionToken, $submittedToken)) {
         http_response_code(419);
+        header('Content-Type: text/plain; charset=UTF-8');
         exit('CSRF token tidak valid. Silakan muat ulang halaman dan coba lagi.');
     }
 }
