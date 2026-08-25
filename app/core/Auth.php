@@ -21,10 +21,13 @@ final class Auth
             'SELECT u.id, u.role_id, u.name, u.username, u.email, u.password, u.status, r.name AS role_name, r.slug AS role_slug
              FROM users u
              INNER JOIN roles r ON r.id = u.role_id
-             WHERE (u.username = :identity OR u.email = :identity)
+             WHERE (u.username = :username OR u.email = :email)
              LIMIT 1'
         );
-        $statement->execute(['identity' => $identity]);
+        $statement->execute([
+            'username' => $identity,
+            'email' => $identity,
+        ]);
         $user = $statement->fetch();
 
         if (!$user || $user['status'] !== 'active' || !password_verify($password, $user['password'])) {
