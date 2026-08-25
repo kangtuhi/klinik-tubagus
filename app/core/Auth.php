@@ -70,6 +70,34 @@ final class Auth
         ];
     }
 
+    public static function can(string $permission): bool
+    {
+        if (!self::check()) {
+            return false;
+        }
+
+        $permission = trim($permission);
+        if ($permission === '') {
+            return false;
+        }
+
+        $pdo = Database::connection();
+        $statement = $pdo->prepare(
+            'SELECT 1
+             FROM role_permissions rp
+             INNER JOIN permissions p ON p.id = rp.permission_id
+             WHERE rp.role_id = :role_id
+               AND p.slug = :permission
+             LIMIT 1'
+        );
+        $statement->execute([
+            'role_id' => Session::get('role_id'),
+            'permission' => $permission,
+        ]);
+
+        return (bool) $statement->fetchColumn();
+    }
+
     public static function logout(): void
     {
         Session::destroy();
