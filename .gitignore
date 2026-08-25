@@ -1,0 +1,23 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# PHP
+vendor/
+
+# Runtime
+storage/logs/*
+storage/cache/*
+public/uploads/*
+
+# Keep runtime directories
+!storage/logs/.gitkeep
+!storage/cache/.gitkeep
+!public/uploads/.gitkeep
