@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../app/core/Auth.php';
 require_once __DIR__ . '/../../../app/core/Database.php';
 require_once __DIR__ . '/../../../app/helpers/auth.php';
 require_once __DIR__ . '/../../../app/helpers/permission.php';
+require_once __DIR__ . '/../../../app/helpers/csrf.php';
 
 require_permission('users.update');
 
@@ -14,6 +15,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Allow: POST');
     exit('Method Not Allowed');
 }
+
+verify_csrf();
 
 $pdo = Database::connection();
 $currentUser = current_user();
