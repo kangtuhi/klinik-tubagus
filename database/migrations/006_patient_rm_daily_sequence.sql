@@ -57,3 +57,12 @@ BEGIN
 END$$
 
 DELIMITER ;
+
+-- ============================================================
+-- MIGRASI DATA PASIEN LAMA
+-- Pasien yang sudah terdaftar sebelum format RM harian diterapkan
+-- akan dikonversi ke format baru dan masuk ke urutan hari ini.
+-- ============================================================
+UPDATE patients
+SET medical_record_number = CONCAT('RM-', YEAR(CURRENT_DATE), '-', LPAD(id, 6, '0'))
+WHERE medical_record_number NOT LIKE 'RMKT-%';
