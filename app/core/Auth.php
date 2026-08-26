@@ -84,8 +84,9 @@ final class Auth
 
     // ============================================================
     // CEK PERMISSION RBAC
-    // Permission aplikasi menggunakan kolom name sebagai identifier.
-    // Kolom slug tetap menjadi atribut database yang terpisah.
+    // Menerima identifier permission dari kolom name maupun slug.
+    // Ini menjaga kompatibilitas dengan pemanggilan seperti
+    // Auth::can('doctors.view') dan data RBAC yang memakai slug.
     // ============================================================
     public static function can(string $permission): bool
     {
@@ -104,12 +105,13 @@ final class Auth
              FROM role_permissions rp
              INNER JOIN permissions p ON p.id = rp.permission_id
              WHERE rp.role_id = :role_id
-               AND p.name = :permission
+               AND (p.name = :permission_name OR p.slug = :permission_slug)
              LIMIT 1'
         );
         $statement->execute([
             'role_id' => Session::get('role_id'),
-            'permission' => $permission,
+            'permission_name' => $permission,
+            'permission_slug' => $permission,
         ]);
 
         return (bool) $statement->fetchColumn();
