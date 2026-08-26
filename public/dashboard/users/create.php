@@ -6,7 +6,12 @@ require_once __DIR__ . '/../../../app/core/Auth.php';
 require_once __DIR__ . '/../../../app/core/Database.php';
 require_once __DIR__ . '/../../../app/helpers/auth.php';
 require_once __DIR__ . '/../../../app/helpers/permission.php';
+require_once __DIR__ . '/../../../app/helpers/csrf.php';
 
+// ============================================================
+// GUARD AKSES CREATE USER
+// Pengguna wajib memiliki permission users.create.
+// ============================================================
 require_permission('users.create');
 
 $pdo = Database::connection();
@@ -19,9 +24,21 @@ $email = '';
 $roleId = '';
 $status = 'active';
 
+// ============================================================
+// AMBIL ROLE YANG TERSEDIA
+// Role Owner tetap ditampilkan hanya untuk Owner. Ini adalah
+// lapisan UI; keamanan sebenarnya tetap ditegakkan di server.
+// ============================================================
 $roles = $pdo->query('SELECT id, name, slug FROM roles ORDER BY id ASC')->fetchAll();
+$isCurrentUserOwner = (($currentUser['role_slug'] ?? '') === 'owner');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // ========================================================
+    // VALIDASI CSRF
+    // Mencegah request POST yang tidak berasal dari form resmi.
+    // ========================================================
+    verify_csrf();
+
     $name = trim((string) ($_POST['name'] ?? ''));
     $username = trim((string) ($_POST['username'] ?? ''));
     $email = trim((string) ($_POST['email'] ?? ''));
@@ -30,6 +47,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $roleId = (string) ($_POST['role_id'] ?? '');
     $status = (string) ($_POST['status'] ?? 'active');
 
+    // ========================================================
+    // VALIDASI INPUT DASAR
+    // ========================================================
     if ($name === '' || mb_strlen($name) > 150) {
         $errors[] = 'Nama wajib diisi dan maksimal 150 karakter.';
     }
@@ -60,6 +80,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
+        // ====================================================
+        // AMBIL ROLE TARGET DARI DATABASE
+        // Jangan mempercayai role_id dari browser.
+        // ====================================================
         $roleStatement = $pdo->prepare('SELECT id, name, slug FROM roles WHERE id = :id LIMIT 1');
         $roleStatement->execute(['id' => $roleIdInt]);
         $role = $roleStatement->fetch();
@@ -68,15 +92,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Role yang dipilih tidak ditemukan.';
         }
 
-        // Owner adalah role tertinggi. Hanya Owner yang boleh membuat Owner.
-        if (!$errors && $role['slug'] === 'owner' && ($currentUser['role_slug'] ?? '') !== 'owner') {
-            $errors[] = 'Hanya Owner yang dapat membuat akun Owner.';
+        // ====================================================
+        // PROTEKSI OWNER — SERVER-SIDE
+        // HANYA akun yang role-nya Owner yang boleh membuat Owner.
+        // Pemeriksaan dilakukan terhadap role aktif di database,
+        // bukan hanya nilai role dari form atau dropdown.
+        // ====================================================
+        if (!$errors && $role['slug'] === 'owner') {
+            $currentRoleStatement = $pdo->prepare(
+                'SELECT r.slug
+                 FROM users u
+                 INNER JOIN roles r ON r.id = u.role_id
+                 WHERE u.id = :user_id
+                 LIMIT 1'
+            );
+            $currentRoleStatement->execute([
+                'user_id' => $currentUser['id'] ?? 0,
+            ]);
+            $currentRoleSlug = (string) $currentRoleStatement->fetchColumn();
+
+            if ($currentRoleSlug !== 'owner') {
+                $errors[] = 'Akses ditolak. Hanya Owner yang dapat membuat akun Owner.';
+            }
         }
     }
 
     if (!$errors) {
-        // Gunakan placeholder berbeda karena PDO MySQL dengan native prepares
-        // tidak aman untuk memakai named placeholder yang sama lebih dari sekali.
+        // ====================================================
+        // CEK USERNAME / EMAIL DUPLIKAT
+        // ====================================================
         if ($email !== '') {
             $duplicate = $pdo->prepare(
                 'SELECT username, email FROM users
@@ -109,6 +153,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
+        // ====================================================
+        // SIMPAN USER BARU
+        // Password selalu disimpan menggunakan password_hash().
+        // ====================================================
         try {
             $statement = $pdo->prepare(
                 'INSERT INTO users (role_id, name, username, email, password, status)
@@ -229,11 +277,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <select id="role_id" name="role_id" required>
                         <option value="">— Pilih Role —</option>
                         <?php foreach ($roles as $role): ?>
+                            <?php if ($role['slug'] === 'owner' && !$isCurrentUserOwner) continue; ?>
                             <option value="<?= (int) $role['id'] ?>" <?= (string) $roleId === (string) $role['id'] ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($role['name'], ENT_QUOTES, 'UTF-8') ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
+                    <?php if (!$isCurrentUserOwner): ?><p class="hint">Role Owner hanya dapat diberikan oleh Owner.</p><?php endif; ?>
                 </div>
 
                 <div>
