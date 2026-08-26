@@ -188,13 +188,13 @@ $statusLabel = (string) $patient['status'] === 'active' ? 'ACTIVE' : 'INACTIVE';
                 <p class="subtitle">Pusat informasi identitas dan perjalanan klinis pasien.</p>
             </div>
             <div class="actions">
-                <?php if (can('patients.update')): ?>
+                <?php if (Auth::can('patients.update')): ?>
                     <a class="button secondary" href="/dashboard/patients/edit.php?id=<?= (int) $patientId ?>">✏️ Edit</a>
                 <?php endif; ?>
-                <?php if (can('visits.create') && (string) $patient['status'] === 'active'): ?>
+                <?php if (Auth::can('visits.create') && (string) $patient['status'] === 'active'): ?>
                     <a class="button primary" href="/dashboard/patients/visit.php?id=<?= (int) $patientId ?>">🩺 Kunjungan Baru</a>
                 <?php endif; ?>
-                <?php if (can('visits.view')): ?>
+                <?php if (Auth::can('visits.view')): ?>
                     <a class="button secondary" href="/dashboard/patients/visits.php?id=<?= (int) $patientId ?>">📋 Semua Kunjungan</a>
                 <?php endif; ?>
             </div>
@@ -275,7 +275,7 @@ $statusLabel = (string) $patient['status'] === 'active' ? 'ACTIVE' : 'INACTIVE';
         <section class="section">
             <div class="section-head">
                 <h2 class="section-title">🩺 Riwayat Kunjungan</h2>
-                <?php if (can('visits.view')): ?>
+                <?php if (Auth::can('visits.view')): ?>
                     <a class="button secondary" href="/dashboard/patients/visits.php?id=<?= (int) $patientId ?>">Lihat Semua</a>
                 <?php endif; ?>
             </div>
