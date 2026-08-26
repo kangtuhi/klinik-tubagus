@@ -3,19 +3,107 @@
 declare(strict_types=1);
 
 // ============================================================
-// NAVBAR GLOBAL KLINIK TUBAGUS
-// Menampilkan identitas aplikasi, username pengguna aktif,
-// role pengguna, serta dropdown untuk akses logout.
-// File ini dipakai bersama oleh halaman dashboard dan modul.
+// NAVBAR + SIDEBAR GLOBAL KLINIK TUBAGUS
+// Menampilkan identitas aplikasi, navigasi modul, username,
+// role pengguna, serta dropdown logout pada seluruh halaman.
 // ============================================================
 $currentUser = current_user();
 
 $navbarName = (string) ($currentUser['name'] ?? $currentUser['username'] ?? 'Pengguna');
 $navbarUsername = (string) ($currentUser['username'] ?? '');
 $navbarRole = (string) ($currentUser['role_name'] ?? '');
+$currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+
+// ============================================================
+// HELPER NAVIGASI AKTIF
+// Memberi penanda visual pada menu yang sedang dibuka.
+// ============================================================
+$isActive = static function (string $path) use ($currentPath): bool {
+    return $currentPath === $path || str_starts_with($currentPath, rtrim($path, '/') . '/');
+};
 ?>
 
 <style>
+    /* ========================================================
+       LAYOUT SIDEBAR GLOBAL
+       Sidebar dibuat tetap di sisi kiri agar smoke test semua
+       modul dapat dilakukan tanpa kembali ke dashboard.
+       ======================================================== */
+    body {
+        padding-left: 250px;
+    }
+
+    .global-sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: 250px;
+        background: #17202a;
+        color: #fff;
+        z-index: 1100;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .global-sidebar__brand {
+        display: block;
+        padding: 22px 20px;
+        color: #fff;
+        text-decoration: none;
+        font-size: 19px;
+        font-weight: 800;
+        border-bottom: 1px solid rgba(255,255,255,.10);
+    }
+
+    .global-sidebar__section {
+        padding: 18px 12px 8px;
+        color: #98a2b3;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .global-sidebar__nav {
+        padding: 4px 10px 18px;
+    }
+
+    .global-sidebar__link {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 12px;
+        margin: 3px 0;
+        border-radius: 10px;
+        color: #d0d5dd;
+        text-decoration: none;
+        font-weight: 700;
+        transition: background .18s ease, color .18s ease;
+    }
+
+    .global-sidebar__link:hover,
+    .global-sidebar__link:focus-visible {
+        background: rgba(255,255,255,.08);
+        color: #fff;
+        outline: none;
+    }
+
+    .global-sidebar__link.is-active {
+        background: #146c43;
+        color: #fff;
+    }
+
+    .global-sidebar__footer {
+        margin-top: auto;
+        padding: 12px 14px 18px;
+        color: #98a2b3;
+        font-size: 12px;
+    }
+
+    /* ========================================================
+       NAVBAR GLOBAL
+       Navbar mengikuti area konten di sebelah kanan sidebar.
+       ======================================================== */
     .global-navbar {
         padding: 14px 28px;
         background: #fff;
@@ -130,12 +218,63 @@ $navbarRole = (string) ($currentUser['role_name'] ?? '');
     }
 
     @media (max-width: 700px) {
+        body { padding-left: 220px; }
+        .global-sidebar { width: 220px; }
+        .global-sidebar__brand { padding: 18px 16px; font-size: 17px; }
         .global-navbar { padding: 12px 16px; }
         .global-navbar__brand { font-size: 18px; }
         .global-navbar__trigger { padding: 8px 10px; }
         .global-navbar__menu { width: 220px; }
     }
 </style>
+
+<!-- ==========================================================
+     SIDEBAR GLOBAL
+     Navigasi ditampilkan berdasarkan permission pengguna agar
+     menu smoke test tetap mengikuti aturan RBAC.
+     ========================================================== -->
+<aside class="global-sidebar" aria-label="Navigasi utama">
+    <a class="global-sidebar__brand" href="/dashboard/">🏥 Klinik Tubagus</a>
+
+    <div class="global-sidebar__section">Utama</div>
+    <nav class="global-sidebar__nav">
+        <a class="global-sidebar__link <?= $isActive('/dashboard/') && !$isActive('/dashboard/patients') && !$isActive('/dashboard/doctors') && !$isActive('/dashboard/users') ? 'is-active' : '' ?>" href="/dashboard/">
+            🏠 <span>Dashboard</span>
+        </a>
+    </nav>
+
+    <div class="global-sidebar__section">Klinik</div>
+    <nav class="global-sidebar__nav">
+        <?php if (Auth::can('patients.view')): ?>
+            <a class="global-sidebar__link <?= $isActive('/dashboard/patients') ? 'is-active' : '' ?>" href="/dashboard/patients/">
+                👥 <span>Pasien</span>
+            </a>
+        <?php endif; ?>
+
+        <?php if (Auth::can('doctors.view')): ?>
+            <a class="global-sidebar__link <?= $isActive('/dashboard/doctors') ? 'is-active' : '' ?>" href="/dashboard/doctors/">
+                🩺 <span>Dokter</span>
+            </a>
+        <?php endif; ?>
+    </nav>
+
+    <div class="global-sidebar__section">Administrasi</div>
+    <nav class="global-sidebar__nav">
+        <?php if (Auth::can('users.view')): ?>
+            <a class="global-sidebar__link <?= $isActive('/dashboard/users') ? 'is-active' : '' ?>" href="/dashboard/users/">
+                👤 <span>Users</span>
+            </a>
+        <?php endif; ?>
+
+        <a class="global-sidebar__link <?= $isActive('/dashboard/rbac-test.php') ? 'is-active' : '' ?>" href="/dashboard/rbac-test.php">
+            🔐 <span>RBAC Smoke Test</span>
+        </a>
+    </nav>
+
+    <div class="global-sidebar__footer">
+        Klinik Tubagus · Admin Panel
+    </div>
+</aside>
 
 <header class="global-navbar">
     <a class="global-navbar__brand" href="/dashboard/">🏥 Klinik Tubagus</a>
