@@ -10,7 +10,7 @@ SELECT r.id, p.id
 FROM roles r
 JOIN permissions p ON p.slug IN (
     'users.view', 'users.create', 'users.update',
-    'patients.view', 'patients.create', 'patients.update', 'patients.delete',
+    'patients.view', 'patients.create', 'patients.update',
     'doctors.view', 'doctors.create', 'doctors.update',
     'medical_records.view',
     'medicines.view',
