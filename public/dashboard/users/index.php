@@ -30,12 +30,6 @@ $csrf = csrf_token();
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; font-family: Arial, sans-serif; background: #f4f6f8; color: #17202a; }
-        header { padding: 18px 28px; background: #fff; border-bottom: 1px solid #e3e7eb; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-        header strong { font-size: 20px; }
-        .actions { display: flex; gap: 12px; align-items: center; }
-        a { text-decoration: none; font-weight: 700; }
-        .back { color: #475467; }
-        .logout { color: #b42318; }
         main { width: min(1200px, calc(100% - 32px)); margin: 36px auto; }
         .panel { background: #fff; border: 1px solid #e3e7eb; border-radius: 18px; padding: 26px; box-shadow: 0 12px 35px rgba(0,0,0,.06); }
         .titlebar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 22px; }
@@ -60,17 +54,11 @@ $csrf = csrf_token();
         .action.delete { background: #fff1f0; color: #b42318; }
         form.inline { margin: 0; }
         .notice { margin-bottom: 18px; padding: 12px 15px; border-radius: 10px; background: #ecfdf3; color: #067647; }
-        @media (max-width: 700px) { header { padding: 16px; } main { margin-top: 22px; } .titlebar { align-items: flex-start; flex-direction: column; } }
+        @media (max-width: 700px) { main { margin-top: 22px; } .titlebar { align-items: flex-start; flex-direction: column; } }
     </style>
 </head>
 <body>
-<header>
-    <strong>🏥 Klinik Tubagus</strong>
-    <div class="actions">
-        <a class="back" href="/dashboard/">Dashboard</a>
-        <a class="logout" href="/logout.php">Logout</a>
-    </div>
-</header>
+<?php require __DIR__ . '/../_partials/navbar.php'; ?>
 
 <main>
     <section class="panel">

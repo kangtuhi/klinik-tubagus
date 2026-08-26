@@ -18,23 +18,17 @@ $user = current_user();
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; min-height: 100vh; font-family: Arial, sans-serif; background: #f4f6f8; color: #17202a; }
-        header { padding: 18px 28px; background: #fff; border-bottom: 1px solid #e3e7eb; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-        header strong { font-size: 20px; }
-        .logout { text-decoration: none; color: #b42318; font-weight: 700; }
         main { width: min(900px, calc(100% - 32px)); margin: 40px auto; }
         .hero, .card { background: #fff; border: 1px solid #e3e7eb; border-radius: 18px; padding: 28px; box-shadow: 0 12px 35px rgba(0,0,0,.06); }
         h1 { margin-top: 0; }
         .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px; }
         .label { color: #667085; font-size: 13px; margin-bottom: 7px; }
         .value { font-weight: 700; font-size: 18px; }
-        @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } header { padding: 16px; } main { margin-top: 24px; } }
+        @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } main { margin-top: 24px; } }
     </style>
 </head>
 <body>
-<header>
-    <strong>🏥 Klinik Tubagus</strong>
-    <a class="logout" href="/logout.php">Logout</a>
-</header>
+<?php require __DIR__ . '/_partials/navbar.php'; ?>
 
 <main>
     <section class="hero">
