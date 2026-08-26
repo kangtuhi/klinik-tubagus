@@ -16,7 +16,8 @@ require_permission('users.create');
 
 $pdo = Database::connection();
 $currentUser = current_user();
-$errors = [];
+$fieldErrors = [];
+$globalError = null;
 
 $name = '';
 $username = '';
@@ -48,111 +49,106 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status = (string) ($_POST['status'] ?? 'active');
 
     // ========================================================
-    // VALIDASI INPUT DASAR
+    // VALIDASI PER FIELD
+    // Setiap field diperiksa secara independen agar semua error
+    // dapat muncul sekaligus tepat di bawah input terkait.
     // ========================================================
-    if ($name === '' || mb_strlen($name) > 150) {
-        $errors[] = 'Nama wajib diisi dan maksimal 150 karakter.';
+    if ($name === '') {
+        $fieldErrors['name'] = 'Nama lengkap wajib diisi.';
+    } elseif (mb_strlen($name) > 150) {
+        $fieldErrors['name'] = 'Nama lengkap maksimal 150 karakter.';
     }
 
     if (!preg_match('/^[A-Za-z0-9._-]{3,100}$/', $username)) {
-        $errors[] = 'Username harus 3–100 karakter dan hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda minus.';
+        $fieldErrors['username'] = 'Username harus 3–100 karakter dan hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda minus.';
     }
 
-    if ($email !== '' && (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 191)) {
-        $errors[] = 'Format email tidak valid.';
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $fieldErrors['email'] = 'Format email tidak valid.';
+    } elseif (mb_strlen($email) > 191) {
+        $fieldErrors['email'] = 'Email maksimal 191 karakter.';
     }
 
     if (strlen($password) < 8) {
-        $errors[] = 'Password minimal 8 karakter.';
+        $fieldErrors['password'] = 'Password minimal 8 karakter.';
     }
 
-    if ($password !== $passwordConfirmation) {
-        $errors[] = 'Konfirmasi password tidak cocok.';
+    if ($passwordConfirmation === '') {
+        $fieldErrors['password_confirmation'] = 'Konfirmasi password wajib diisi.';
+    } elseif ($password !== $passwordConfirmation) {
+        $fieldErrors['password_confirmation'] = 'Konfirmasi password tidak cocok.';
     }
 
     $roleIdInt = filter_var($roleId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
     if ($roleIdInt === false) {
-        $errors[] = 'Role wajib dipilih.';
+        $fieldErrors['role_id'] = 'Role wajib dipilih.';
     }
 
     if (!in_array($status, ['active', 'inactive', 'suspended'], true)) {
-        $errors[] = 'Status tidak valid.';
+        $fieldErrors['status'] = 'Status tidak valid.';
     }
 
-    if (!$errors) {
-        // ====================================================
-        // AMBIL ROLE TARGET DARI DATABASE
-        // Jangan mempercayai role_id dari browser.
-        // ====================================================
+    // ========================================================
+    // AMBIL DAN VALIDASI ROLE TARGET
+    // Jangan mempercayai role_id yang dikirim oleh browser.
+    // ========================================================
+    if (!isset($fieldErrors['role_id'])) {
         $roleStatement = $pdo->prepare('SELECT id, name, slug FROM roles WHERE id = :id LIMIT 1');
         $roleStatement->execute(['id' => $roleIdInt]);
         $role = $roleStatement->fetch();
 
         if (!$role) {
-            $errors[] = 'Role yang dipilih tidak ditemukan.';
-        }
-
-        // ====================================================
-        // PROTEKSI OWNER — SERVER-SIDE
-        // HANYA akun yang role-nya Owner yang boleh membuat Owner.
-        // Pemeriksaan dilakukan terhadap role aktif di database,
-        // bukan hanya nilai role dari form atau dropdown.
-        // ====================================================
-        if (!$errors && $role['slug'] === 'owner') {
-            $currentRoleStatement = $pdo->prepare(
-                'SELECT r.slug
-                 FROM users u
-                 INNER JOIN roles r ON r.id = u.role_id
-                 WHERE u.id = :user_id
-                 LIMIT 1'
-            );
-            $currentRoleStatement->execute([
-                'user_id' => $currentUser['id'] ?? 0,
-            ]);
-            $currentRoleSlug = (string) $currentRoleStatement->fetchColumn();
-
-            if ($currentRoleSlug !== 'owner') {
-                $errors[] = 'Akses ditolak. Hanya Owner yang dapat membuat akun Owner.';
-            }
+            $fieldErrors['role_id'] = 'Role yang dipilih tidak ditemukan.';
         }
     }
 
-    if (!$errors) {
-        // ====================================================
-        // CEK USERNAME / EMAIL DUPLIKAT
-        // ====================================================
+    // ========================================================
+    // PROTEKSI OWNER — SERVER-SIDE
+    // Hanya akun Owner yang boleh membuat akun dengan role Owner.
+    // ========================================================
+    if (isset($role) && $role['slug'] === 'owner') {
+        $currentRoleStatement = $pdo->prepare(
+            'SELECT r.slug
+             FROM users u
+             INNER JOIN roles r ON r.id = u.role_id
+             WHERE u.id = :user_id
+             LIMIT 1'
+        );
+        $currentRoleStatement->execute(['user_id' => $currentUser['id'] ?? 0]);
+        $currentRoleSlug = (string) $currentRoleStatement->fetchColumn();
+
+        if ($currentRoleSlug !== 'owner') {
+            $fieldErrors['role_id'] = 'Akses ditolak. Hanya Owner yang dapat membuat akun Owner.';
+        }
+    }
+
+    // ========================================================
+    // CEK DUPLIKAT USERNAME DAN EMAIL
+    // Pemeriksaan tetap berjalan per field walaupun field lain error.
+    // ========================================================
+    if (!isset($fieldErrors['username']) || ($email !== '' && !isset($fieldErrors['email']))) {
         if ($email !== '') {
             $duplicate = $pdo->prepare(
                 'SELECT username, email FROM users
-                 WHERE username = :username OR email = :email
-                 LIMIT 1'
+                 WHERE username = :username OR email = :email'
             );
-            $duplicate->execute([
-                'username' => $username,
-                'email' => $email,
-            ]);
+            $duplicate->execute(['username' => $username, 'email' => $email]);
         } else {
-            $duplicate = $pdo->prepare(
-                'SELECT username, email FROM users
-                 WHERE username = :username
-                 LIMIT 1'
-            );
+            $duplicate = $pdo->prepare('SELECT username, email FROM users WHERE username = :username');
             $duplicate->execute(['username' => $username]);
         }
 
-        $existing = $duplicate->fetch();
-
-        if ($existing) {
-            if ($existing['username'] === $username) {
-                $errors[] = 'Username sudah digunakan.';
+        foreach ($duplicate->fetchAll() as $existing) {
+            if (!isset($fieldErrors['username']) && $existing['username'] === $username) {
+                $fieldErrors['username'] = 'Username sudah digunakan.';
             }
-            if ($email !== '' && $existing['email'] === $email) {
-                $errors[] = 'Email sudah digunakan.';
+            if ($email !== '' && !isset($fieldErrors['email']) && $existing['email'] === $email) {
+                $fieldErrors['email'] = 'Email sudah digunakan.';
             }
         }
     }
 
-    if (!$errors) {
+    if (!$fieldErrors) {
         // ====================================================
         // SIMPAN USER BARU
         // Password selalu disimpan menggunakan password_hash().
@@ -174,10 +170,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: /dashboard/users/?created=1');
             exit;
         } catch (PDOException $exception) {
-            if ((int) $exception->errorInfo[1] === 1062) {
-                $errors[] = 'Username atau email sudah digunakan.';
+            if ((int) ($exception->errorInfo[1] ?? 0) === 1062) {
+                $globalError = 'Username atau email sudah digunakan. Silakan periksa kembali data yang dimasukkan.';
             } else {
-                $errors[] = 'Gagal membuat user. Silakan coba lagi.';
+                $globalError = 'Gagal membuat user. Silakan coba lagi.';
             }
         }
     }
@@ -208,13 +204,15 @@ $csrfToken = csrf_token();
         .panel { background: #fff; border: 1px solid #e3e7eb; border-radius: 18px; padding: 28px; box-shadow: 0 12px 35px rgba(0,0,0,.06); }
         h1 { margin: 0 0 7px; }
         .subtitle { margin: 0 0 24px; color: #667085; }
-        .errors { margin: 0 0 22px; padding: 14px 18px; border-radius: 12px; background: #fff1f0; color: #b42318; }
-        .errors li + li { margin-top: 6px; }
+        .global-error { margin: 0 0 22px; padding: 14px 18px; border-radius: 12px; background: #fff1f0; color: #b42318; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+        .field { min-width: 0; }
         .full { grid-column: 1 / -1; }
         label { display: block; margin-bottom: 7px; font-weight: 700; font-size: 14px; }
         input, select { width: 100%; padding: 12px 13px; border: 1px solid #d0d5dd; border-radius: 10px; font: inherit; background: #fff; }
         input:focus, select:focus { outline: 3px solid rgba(20,108,67,.12); border-color: #146c43; }
+        input.is-invalid, select.is-invalid { border-color: #d92d20; }
+        .field-error { margin: 7px 0 0; color: #b42318; font-size: 12px; line-height: 1.45; }
         .hint { margin: 7px 0 0; color: #98a2b3; font-size: 12px; }
         .footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 25px; }
         .button { border: 0; cursor: pointer; padding: 12px 17px; border-radius: 10px; font-weight: 700; font-size: 14px; }
@@ -237,15 +235,8 @@ $csrfToken = csrf_token();
         <h1>➕ Tambah User</h1>
         <p class="subtitle">Buat akun pengguna baru untuk Klinik Tubagus.</p>
 
-        <?php if ($errors): ?>
-            <div class="errors">
-                <strong>Periksa kembali:</strong>
-                <ul>
-                    <?php foreach ($errors as $error): ?>
-                        <li><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></li>
-                    <?php endforeach; ?>
-                </ul>
-            </div>
+        <?php if ($globalError): ?>
+            <div class="global-error"><?= htmlspecialchars($globalError, ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
 
         <form method="post" novalidate>
@@ -253,55 +244,56 @@ $csrfToken = csrf_token();
             <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
 
             <div class="grid">
-                <div class="full">
+                <div class="field full">
                     <label for="name">Nama Lengkap</label>
-                    <input id="name" name="name" type="text" maxlength="150" required value="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?>" autocomplete="name">
+                    <input class="<?= isset($fieldErrors['name']) ? 'is-invalid' : '' ?>" id="name" name="name" type="text" maxlength="150" required value="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?>" autocomplete="name" aria-invalid="<?= isset($fieldErrors['name']) ? 'true' : 'false' ?>">
+                    <?php if (isset($fieldErrors['name'])): ?><p class="field-error">❌ <?= htmlspecialchars($fieldErrors['name'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
                 </div>
 
-                <div>
+                <div class="field">
                     <label for="username">Username</label>
-                    <input id="username" name="username" type="text" maxlength="100" required value="<?= htmlspecialchars($username, ENT_QUOTES, 'UTF-8') ?>" autocomplete="username">
-                    <p class="hint">3–100 karakter: huruf, angka, titik, _ atau -.</p>
+                    <input class="<?= isset($fieldErrors['username']) ? 'is-invalid' : '' ?>" id="username" name="username" type="text" maxlength="100" required value="<?= htmlspecialchars($username, ENT_QUOTES, 'UTF-8') ?>" autocomplete="username" aria-invalid="<?= isset($fieldErrors['username']) ? 'true' : 'false' ?>">
+                    <?php if (isset($fieldErrors['username'])): ?><p class="field-error">❌ <?= htmlspecialchars($fieldErrors['username'], ENT_QUOTES, 'UTF-8') ?></p><?php else: ?><p class="hint">3–100 karakter: huruf, angka, titik, _ atau -.</p><?php endif; ?>
                 </div>
 
-                <div>
+                <div class="field">
                     <label for="email">Email</label>
-                    <input id="email" name="email" type="email" maxlength="191" value="<?= htmlspecialchars($email, ENT_QUOTES, 'UTF-8') ?>" autocomplete="email">
-                    <p class="hint">Opsional, tetapi harus unik jika diisi.</p>
+                    <input class="<?= isset($fieldErrors['email']) ? 'is-invalid' : '' ?>" id="email" name="email" type="email" maxlength="191" value="<?= htmlspecialchars($email, ENT_QUOTES, 'UTF-8') ?>" autocomplete="email" aria-invalid="<?= isset($fieldErrors['email']) ? 'true' : 'false' ?>">
+                    <?php if (isset($fieldErrors['email'])): ?><p class="field-error">❌ <?= htmlspecialchars($fieldErrors['email'], ENT_QUOTES, 'UTF-8') ?></p><?php else: ?><p class="hint">Opsional, tetapi harus unik jika diisi.</p><?php endif; ?>
                 </div>
 
-                <div>
+                <div class="field">
                     <label for="password">Password</label>
-                    <input id="password" name="password" type="password" minlength="8" required autocomplete="new-password">
-                    <p class="hint">Minimal 8 karakter.</p>
+                    <input class="<?= isset($fieldErrors['password']) ? 'is-invalid' : '' ?>" id="password" name="password" type="password" minlength="8" required autocomplete="new-password" aria-invalid="<?= isset($fieldErrors['password']) ? 'true' : 'false' ?>">
+                    <?php if (isset($fieldErrors['password'])): ?><p class="field-error">❌ <?= htmlspecialchars($fieldErrors['password'], ENT_QUOTES, 'UTF-8') ?></p><?php else: ?><p class="hint">Minimal 8 karakter.</p><?php endif; ?>
                 </div>
 
-                <div>
+                <div class="field">
                     <label for="password_confirmation">Konfirmasi Password</label>
-                    <input id="password_confirmation" name="password_confirmation" type="password" minlength="8" required autocomplete="new-password">
+                    <input class="<?= isset($fieldErrors['password_confirmation']) ? 'is-invalid' : '' ?>" id="password_confirmation" name="password_confirmation" type="password" minlength="8" required autocomplete="new-password" aria-invalid="<?= isset($fieldErrors['password_confirmation']) ? 'true' : 'false' ?>">
+                    <?php if (isset($fieldErrors['password_confirmation'])): ?><p class="field-error">❌ <?= htmlspecialchars($fieldErrors['password_confirmation'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
                 </div>
 
-                <div>
+                <div class="field">
                     <label for="role_id">Role</label>
-                    <select id="role_id" name="role_id" required>
+                    <select class="<?= isset($fieldErrors['role_id']) ? 'is-invalid' : '' ?>" id="role_id" name="role_id" required aria-invalid="<?= isset($fieldErrors['role_id']) ? 'true' : 'false' ?>">
                         <option value="">— Pilih Role —</option>
                         <?php foreach ($roles as $role): ?>
                             <?php if ($role['slug'] === 'owner' && !$isCurrentUserOwner) continue; ?>
-                            <option value="<?= (int) $role['id'] ?>" <?= (string) $roleId === (string) $role['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($role['name'], ENT_QUOTES, 'UTF-8') ?>
-                            </option>
+                            <option value="<?= (int) $role['id'] ?>" <?= (string) $roleId === (string) $role['id'] ? 'selected' : '' ?>><?= htmlspecialchars($role['name'], ENT_QUOTES, 'UTF-8') ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <?php if (!$isCurrentUserOwner): ?><p class="hint">Role Owner hanya dapat diberikan oleh Owner.</p><?php endif; ?>
+                    <?php if (isset($fieldErrors['role_id'])): ?><p class="field-error">❌ <?= htmlspecialchars($fieldErrors['role_id'], ENT_QUOTES, 'UTF-8') ?></p><?php elseif (!$isCurrentUserOwner): ?><p class="hint">Role Owner hanya dapat diberikan oleh Owner.</p><?php endif; ?>
                 </div>
 
-                <div>
+                <div class="field">
                     <label for="status">Status</label>
-                    <select id="status" name="status">
+                    <select class="<?= isset($fieldErrors['status']) ? 'is-invalid' : '' ?>" id="status" name="status" aria-invalid="<?= isset($fieldErrors['status']) ? 'true' : 'false' ?>">
                         <?php foreach (['active' => 'Active', 'inactive' => 'Inactive', 'suspended' => 'Suspended'] as $value => $label): ?>
                             <option value="<?= $value ?>" <?= $status === $value ? 'selected' : '' ?>><?= $label ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <?php if (isset($fieldErrors['status'])): ?><p class="field-error">❌ <?= htmlspecialchars($fieldErrors['status'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
                 </div>
             </div>
 
