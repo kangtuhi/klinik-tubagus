@@ -16,7 +16,6 @@ require_once __DIR__ . '/../../../app/helpers/csrf.php';
 require_permission('doctors.create');
 
 $pdo = Database::connection();
-$errors = [];
 $fieldErrors = [];
 
 // ============================================================
@@ -49,9 +48,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $form['email'] = trim((string) ($_POST['email'] ?? ''));
 
     // ========================================================
-    // VALIDASI INPUT SERVER-SIDE
-    // Pesan disimpan per field agar UI dapat menampilkannya
-    // tepat di bawah input yang bermasalah.
+    // VALIDASI PER FIELD
+    // Setiap field divalidasi secara independen supaya beberapa
+    // kesalahan dapat ditampilkan sekaligus di lokasi masing-masing.
     // ========================================================
     if ($form['full_name'] === '') {
         $fieldErrors['full_name'] = 'Nama dokter wajib diisi.';
@@ -81,10 +80,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ========================================================
     // CEK DUPLIKAT SIP / STR
-    // Menempatkan pesan langsung pada field terkait agar lebih
-    // ringkas dan premium daripada daftar error global.
+    // Tetap dijalankan walaupun field lain memiliki error agar
+    // seluruh masalah pada satu submission dapat terlihat sekaligus.
     // ========================================================
-    if (!$fieldErrors && ($form['sip_number'] !== '' || $form['str_number'] !== '')) {
+    if ($form['sip_number'] !== '' || $form['str_number'] !== '') {
         $duplicate = $pdo->prepare(
             'SELECT sip_number, str_number
              FROM doctors
