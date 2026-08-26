@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../../app/helpers/permission.php';
 // permission patients.view.
 // ============================================================
 require_permission('patients.view');
+
 Session::start();
 
 // ============================================================
