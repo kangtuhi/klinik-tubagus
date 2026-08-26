@@ -182,6 +182,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+// ============================================================
+// TOKEN CSRF FORM
+// Token dibuat dari session yang sama dengan verify_csrf().
+// ============================================================
+$csrfToken = csrf_token();
 ?>
 <!doctype html>
 <html lang="id">
@@ -243,6 +249,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form method="post" novalidate>
+            <!-- Token CSRF wajib dikirim bersama setiap POST form. -->
+            <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+
             <div class="grid">
                 <div class="full">
                     <label for="name">Nama Lengkap</label>
