@@ -27,7 +27,6 @@ $pdo = Database::connection();
 
 // ============================================================
 // AMBIL IDENTITAS PASIEN
-// Identitas digunakan sebagai header konteks daftar kunjungan.
 // ============================================================
 $patientQuery = $pdo->prepare(
     'SELECT id, medical_record_number, full_name, status
@@ -45,15 +44,13 @@ if (!$patient) {
 
 // ============================================================
 // TOKEN CSRF VOID
-// Gunakan helper CSRF bersama agar token form dan endpoint void
-// memakai session token yang sama.
+// Token yang sama digunakan oleh form dan endpoint void.
 // ============================================================
 $voidCsrfToken = csrf_token();
 
 // ============================================================
 // AMBIL RIWAYAT KUNJUNGAN
-// Metadata void ikut diambil agar histori klinis tetap transparan
-// setelah kunjungan dibatalkan.
+// Metadata void ikut ditampilkan untuk menjaga audit trail.
 // ============================================================
 $visitQuery = $pdo->prepare(
     'SELECT pv.id, pv.visit_number, pv.visit_date, pv.complaint,
@@ -109,6 +106,20 @@ $visits = $visitQuery->fetchAll();
         .action.edit { background: #f2f4f7; color: #344054; }
         .action.void { background: #fff1f0; color: #b42318; }
         .void-form { display: inline; margin: 0; }
+        .modal-backdrop { display: none; position: fixed; inset: 0; z-index: 1000; align-items: center; justify-content: center; padding: 20px; background: rgba(16,24,40,.55); }
+        .modal-backdrop.is-open { display: flex; }
+        .modal { width: min(520px, 100%); padding: 24px; border-radius: 16px; background: #fff; box-shadow: 0 24px 60px rgba(0,0,0,.2); }
+        .modal h2 { margin: 0 0 8px; }
+        .modal p { color: #667085; line-height: 1.5; }
+        .reason-label { display: block; margin: 18px 0 7px; font-weight: 800; }
+        .reason-input { width: 100%; min-height: 120px; resize: vertical; padding: 12px; border: 1px solid #d0d5dd; border-radius: 10px; font: inherit; }
+        .reason-input:focus { outline: 2px solid #98a2b3; outline-offset: 1px; }
+        .reason-error { display: none; margin-top: 7px; color: #b42318; font-size: 13px; font-weight: 700; }
+        .reason-counter { margin-top: 6px; text-align: right; color: #667085; font-size: 12px; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+        .modal-button { padding: 9px 13px; border: 0; border-radius: 9px; cursor: pointer; font: inherit; font-weight: 800; }
+        .modal-button.cancel { background: #f2f4f7; color: #344054; }
+        .modal-button.submit { background: #b42318; color: #fff; }
         @media (max-width: 700px) {
             main { margin-top: 22px; }
             .titlebar, .visit-head { flex-direction: column; }
@@ -124,7 +135,6 @@ $visits = $visitQuery->fetchAll();
     <section class="panel">
         <!-- =====================================================
              HEADER RIWAYAT
-             Menampilkan identitas singkat dan navigasi profil.
              ===================================================== -->
         <div class="titlebar">
             <div>
@@ -142,18 +152,9 @@ $visits = $visitQuery->fetchAll();
         </div>
 
         <?php if (!$visits): ?>
-            <!-- =================================================
-                 KONDISI KOSONG
-                 Menjelaskan bahwa pasien belum memiliki kunjungan.
-                 ================================================= -->
-            <div class="empty">
-                Belum ada riwayat kunjungan klinis untuk pasien ini.
-            </div>
+            <!-- Kondisi kosong ketika pasien belum mempunyai kunjungan. -->
+            <div class="empty">Belum ada riwayat kunjungan klinis untuk pasien ini.</div>
         <?php else: ?>
-            <!-- =================================================
-                 TIMELINE KUNJUNGAN
-                 Menampilkan record terbaru sampai yang terlama.
-                 ================================================= -->
             <div class="timeline">
                 <?php foreach ($visits as $visit): ?>
                     <article class="visit">
@@ -172,31 +173,22 @@ $visits = $visitQuery->fetchAll();
                         </div>
 
                         <div class="clinical-grid">
-                            <!-- =====================================
-                                 DATA KLINIS
-                                 Setiap bagian dipisahkan agar mudah
-                                 dikembangkan menjadi modul klinis.
-                                 ===================================== -->
                             <div class="clinical-item">
                                 <span class="clinical-label">Keluhan Utama</span>
                                 <div class="clinical-value"><?= htmlspecialchars((string) ($visit['complaint'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></div>
                             </div>
-
                             <div class="clinical-item">
                                 <span class="clinical-label">Diagnosis</span>
                                 <div class="clinical-value"><?= htmlspecialchars((string) ($visit['diagnosis'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></div>
                             </div>
-
                             <div class="clinical-item">
                                 <span class="clinical-label">Pemeriksaan</span>
                                 <div class="clinical-value"><?= htmlspecialchars((string) ($visit['examination'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></div>
                             </div>
-
                             <div class="clinical-item">
                                 <span class="clinical-label">Tindakan / Terapi</span>
                                 <div class="clinical-value"><?= htmlspecialchars((string) ($visit['treatment'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></div>
                             </div>
-
                             <div class="clinical-item full">
                                 <span class="clinical-label">Catatan Klinis</span>
                                 <div class="clinical-value"><?= htmlspecialchars((string) ($visit['notes'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></div>
@@ -204,11 +196,7 @@ $visits = $visitQuery->fetchAll();
                         </div>
 
                         <?php if ($visit['status'] === 'cancelled'): ?>
-                            <!-- =================================
-                                 DETAIL VOID
-                                 Histori void tetap ditampilkan agar
-                                 pembatalan dapat diaudit.
-                                 ================================= -->
+                            <!-- Detail pembatalan tetap tampil untuk audit trail. -->
                             <div class="void-box">
                                 <p class="void-meta">
                                     🚫 Dibatalkan
@@ -231,13 +219,13 @@ $visits = $visitQuery->fetchAll();
                             <?php endif; ?>
 
                             <?php if ($visit['status'] !== 'cancelled' && Auth::can('visits.void')): ?>
-                                <!-- Form POST digunakan agar void tidak dapat dipicu melalui GET. -->
-                                <form class="void-form" method="post" action="/dashboard/patients/visit-void.php" onsubmit="return confirm('⚠️ Batalkan kunjungan ini?\n\nRecord tidak akan dihapus, tetapi status kunjungan akan menjadi Cancelled.');">
-                                    <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($voidCsrfToken, ENT_QUOTES, 'UTF-8') ?>">
-                                    <input type="hidden" name="id" value="<?= (int) $visit['id'] ?>">
-                                    <input type="hidden" name="void_reason" value="Pembatalan kunjungan melalui riwayat pasien.">
-                                    <button class="action void" type="submit">Void</button>
-                                </form>
+                                <!-- Tombol membuka form alasan; proses tetap memakai POST + CSRF. -->
+                                <button
+                                    class="action void js-open-void"
+                                    type="button"
+                                    data-visit-id="<?= (int) $visit['id'] ?>"
+                                    data-visit-number="<?= htmlspecialchars((string) $visit['visit_number'], ENT_QUOTES, 'UTF-8') ?>"
+                                >Void</button>
                             <?php endif; ?>
                         </div>
                     </article>
@@ -246,5 +234,120 @@ $visits = $visitQuery->fetchAll();
         <?php endif; ?>
     </section>
 </main>
+
+<!-- ==========================================================
+     MODAL VOID
+     Alasan wajib diisi agar setiap pembatalan memiliki konteks
+     audit yang jelas. Form dikirim sebagai POST ke endpoint void.
+     ========================================================== -->
+<div class="modal-backdrop" id="voidModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="voidModalTitle">
+        <h2 id="voidModalTitle">🚫 Batalkan Kunjungan</h2>
+        <p id="voidVisitInfo">Kunjungan akan dibatalkan tanpa menghapus record klinis.</p>
+
+        <form id="voidForm" method="post" action="/dashboard/patients/visit-void.php">
+            <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($voidCsrfToken, ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="id" id="voidVisitId" value="">
+
+            <label class="reason-label" for="voidReason">Alasan pembatalan <span aria-hidden="true">*</span></label>
+            <textarea
+                class="reason-input"
+                id="voidReason"
+                name="void_reason"
+                maxlength="500"
+                required
+                placeholder="Tuliskan alasan pembatalan kunjungan..."
+            ></textarea>
+            <div class="reason-error" id="voidReasonError">Alasan pembatalan wajib diisi.</div>
+            <div class="reason-counter"><span id="voidReasonCount">0</span>/500</div>
+
+            <div class="modal-actions">
+                <button class="modal-button cancel" type="button" id="voidCancel">Batal</button>
+                <button class="modal-button submit" type="submit">Void Kunjungan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// INTERAKSI FORM VOID
+// JavaScript hanya mengatur UX; validasi final tetap dilakukan
+// oleh endpoint PHP agar keamanan tidak bergantung pada browser.
+// ============================================================
+(function () {
+    const modal = document.getElementById('voidModal');
+    const form = document.getElementById('voidForm');
+    const visitIdInput = document.getElementById('voidVisitId');
+    const visitInfo = document.getElementById('voidVisitInfo');
+    const reasonInput = document.getElementById('voidReason');
+    const reasonError = document.getElementById('voidReasonError');
+    const reasonCount = document.getElementById('voidReasonCount');
+    const cancelButton = document.getElementById('voidCancel');
+
+    function openModal(button) {
+        visitIdInput.value = button.dataset.visitId || '';
+        visitInfo.textContent = 'Kunjungan ' + (button.dataset.visitNumber || '') + ' akan dibatalkan tanpa menghapus record klinis.';
+        reasonInput.value = '';
+        reasonError.style.display = 'none';
+        reasonCount.textContent = '0';
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        reasonInput.focus();
+    }
+
+    function closeModal() {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+    }
+
+    document.querySelectorAll('.js-open-void').forEach(function (button) {
+        button.addEventListener('click', function () {
+            openModal(button);
+        });
+    });
+
+    cancelButton.addEventListener('click', closeModal);
+
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+
+    reasonInput.addEventListener('input', function () {
+        reasonCount.textContent = String(reasonInput.value.length);
+        reasonError.style.display = 'none';
+    });
+
+    form.addEventListener('submit', function (event) {
+        const reason = reasonInput.value.trim();
+
+        if (reason === '') {
+            event.preventDefault();
+            reasonError.textContent = 'Alasan pembatalan wajib diisi.';
+            reasonError.style.display = 'block';
+            reasonInput.focus();
+            return;
+        }
+
+        if (reason.length > 500) {
+            event.preventDefault();
+            reasonError.textContent = 'Alasan pembatalan maksimal 500 karakter.';
+            reasonError.style.display = 'block';
+            reasonInput.focus();
+            return;
+        }
+
+        reasonInput.value = reason;
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+            closeModal();
+        }
+    });
+})();
+</script>
 </body>
 </html>
