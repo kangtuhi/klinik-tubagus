@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../app/core/Auth.php';
 require_once __DIR__ . '/../../../app/core/Database.php';
 require_once __DIR__ . '/../../../app/helpers/auth.php';
 require_once __DIR__ . '/../../../app/helpers/permission.php';
+require_once __DIR__ . '/../../../app/helpers/csrf.php';
 
 // ============================================================
 // AKSES HALAMAN PASIEN
@@ -24,6 +25,7 @@ $pdo = Database::connection();
 $search = trim((string) ($_GET['q'] ?? ''));
 $status = (string) ($_GET['status'] ?? '');
 $statusChanged = (string) ($_GET['status_changed'] ?? '');
+$deleted = (string) ($_GET['deleted'] ?? '');
 
 $conditions = [];
 $params = [];
@@ -60,6 +62,12 @@ $sql .= ' ORDER BY id DESC';
 $statement = $pdo->prepare($sql);
 $statement->execute($params);
 $patients = $statement->fetchAll();
+
+// ============================================================
+// CSRF TOKEN
+// Dipakai untuk form penghapusan pasien permanen.
+// ============================================================
+$csrf = csrf_token();
 ?>
 <!doctype html>
 <html lang="id">
@@ -96,6 +104,8 @@ $patients = $statement->fetchAll();
         .action-link.danger { color: #b42318; }
         .action-link.success { color: #067647; }
         .action-link.profile { color: #175cd3; }
+        .delete-form { margin: 0; }
+        .delete-button { border: 0; background: transparent; padding: 0; cursor: pointer; font: inherit; font-weight: 700; color: #b42318; }
         @media (max-width: 700px) {
             main { margin-top: 22px; }
             .titlebar { align-items: flex-start; flex-direction: column; }
@@ -121,6 +131,14 @@ $patients = $statement->fetchAll();
                 <a class="button" href="/dashboard/patients/create.php">+ Tambah Pasien</a>
             <?php endif; ?>
         </div>
+
+        <?php if ($deleted === '1'): ?>
+            <!-- =================================================
+                 NOTIFIKASI DELETE
+                 Ditampilkan setelah pasien berhasil dihapus.
+                 ================================================= -->
+            <div class="notice">✅ Data pasien berhasil dihapus.</div>
+        <?php endif; ?>
 
         <?php if (in_array($statusChanged, ['active', 'inactive'], true)): ?>
             <!-- =================================================
@@ -196,6 +214,15 @@ $patients = $statement->fetchAll();
                                     <?php else: ?>
                                         <a class="action-link success" href="/dashboard/patients/status.php?id=<?= (int) $patient['id'] ?>">Aktifkan</a>
                                     <?php endif; ?>
+                                <?php endif; ?>
+
+                                <?php if (Auth::can('patients.delete')): ?>
+                                    <!-- Form POST dipakai agar penghapusan tidak berjalan melalui GET. -->
+                                    <form class="delete-form" method="post" action="/dashboard/patients/delete.php" onsubmit="return confirm('⚠️ HAPUS PASIEN INI PERMANEN?\n\nPenghapusan hanya dapat dilakukan jika pasien belum memiliki riwayat kunjungan.');">
+                                        <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="id" value="<?= (int) $patient['id'] ?>">
+                                        <button class="delete-button" type="submit">Hapus</button>
+                                    </form>
                                 <?php endif; ?>
                             </div>
                         </td>
