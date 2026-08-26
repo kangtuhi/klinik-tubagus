@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS patient_rm_sequences (
 
 -- ============================================================
 -- GENERATOR NOMOR RM HARIAN
--- Saat proses CREATE PATIENT mengubah RM sementara menjadi RM
--- final, trigger menggantinya menjadi format:
+-- Saat proses CREATE PATIENT mengganti RM sementara menjadi RM
+-- berbasis tahun, trigger mengubahnya menjadi format:
 -- RMKT-YYYYMMDD-00001
 -- RMKT-YYYYMMDD-00002
 -- dan seterusnya.
@@ -31,9 +31,9 @@ BEGIN
     DECLARE next_number INT UNSIGNED DEFAULT 1;
 
     -- ========================================================
-    -- GENERATE RM SAAT RM SEMENTARA DIGANTI MENJADI RM FINAL
-    -- Nomor urut dikunci melalui INSERT/UPDATE pada tabel sequence
-    -- sehingga registrasi bersamaan tetap mendapatkan nomor unik.
+    -- GENERATE RM FINAL
+    -- Perubahan dari RM sementara/format lama ke RM-YYYY-ID
+    -- akan mengambil nomor urut harian secara atomik.
     -- ========================================================
     IF NEW.medical_record_number <> OLD.medical_record_number
        AND NEW.medical_record_number LIKE 'RM-%' THEN
@@ -60,9 +60,14 @@ DELIMITER ;
 
 -- ============================================================
 -- MIGRASI DATA PASIEN LAMA
--- Pasien yang sudah terdaftar sebelum format RM harian diterapkan
--- akan dikonversi ke format baru dan masuk ke urutan hari ini.
+-- RM lama terlebih dahulu dipindahkan ke nilai sementara agar
+-- trigger benar-benar mendeteksi perubahan RM dan menghasilkan
+-- nomor RMKT harian yang baru.
 -- ============================================================
 UPDATE patients
-SET medical_record_number = CONCAT('RM-', YEAR(CURRENT_DATE), '-', LPAD(id, 6, '0'))
+SET medical_record_number = CONCAT('TMP-MIGRATE-', id)
 WHERE medical_record_number NOT LIKE 'RMKT-%';
+
+UPDATE patients
+SET medical_record_number = CONCAT('RM-', YEAR(CURRENT_DATE), '-', LPAD(id, 6, '0'))
+WHERE medical_record_number LIKE 'TMP-MIGRATE-%';
