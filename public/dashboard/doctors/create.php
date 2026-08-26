@@ -35,11 +35,10 @@ $form = [
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ========================================================
     // VALIDASI CSRF
-    // Melindungi proses pembuatan dokter dari request lintas situs.
+    // Helper CSRF proyek menggunakan field _csrf_token dan
+    // verify_csrf() untuk menghentikan request yang tidak valid.
     // ========================================================
-    if (!csrf_verify($_POST['csrf_token'] ?? '')) {
-        $errors[] = 'Sesi formulir tidak valid. Silakan muat ulang halaman.';
-    }
+    verify_csrf();
 
     $form['full_name'] = trim((string) ($_POST['full_name'] ?? ''));
     $form['sip_number'] = trim((string) ($_POST['sip_number'] ?? ''));
@@ -177,7 +176,7 @@ $csrfToken = csrf_token();
         <?php endif; ?>
 
         <form method="post" novalidate>
-            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
 
             <div class="grid">
                 <div class="field full">
