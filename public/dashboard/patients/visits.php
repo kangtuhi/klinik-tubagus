@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../app/core/Database.php';
 require_once __DIR__ . '/../../../app/core/Session.php';
 require_once __DIR__ . '/../../../app/helpers/auth.php';
 require_once __DIR__ . '/../../../app/helpers/permission.php';
+require_once __DIR__ . '/../../../app/helpers/csrf.php';
 
 // ============================================================
 // AKSES RIWAYAT KUNJUNGAN
@@ -43,16 +44,26 @@ if (!$patient) {
 }
 
 // ============================================================
+// TOKEN CSRF VOID
+// Token dibuat di halaman yang menampilkan form POST void agar
+// endpoint void menerima token yang sama dari session.
+// ============================================================
+$voidCsrfToken = csrf_token('patient_visit_void');
+
+// ============================================================
 // AMBIL RIWAYAT KUNJUNGAN
-// Kunjungan terbaru ditampilkan lebih dahulu agar timeline klinis
-// langsung menunjukkan kondisi terakhir pasien.
+// Metadata void ikut diambil agar histori klinis tetap transparan
+// setelah kunjungan dibatalkan.
 // ============================================================
 $visitQuery = $pdo->prepare(
-    'SELECT id, visit_number, visit_date, complaint, examination,
-            diagnosis, treatment, notes, status, created_at
-     FROM patient_visits
-     WHERE patient_id = :patient_id
-     ORDER BY visit_date DESC, id DESC'
+    'SELECT pv.id, pv.visit_number, pv.visit_date, pv.complaint,
+            pv.examination, pv.diagnosis, pv.treatment, pv.notes,
+            pv.status, pv.created_at, pv.voided_at, pv.void_reason,
+            vu.name AS voided_by_name
+     FROM patient_visits pv
+     LEFT JOIN users vu ON vu.id = pv.voided_by
+     WHERE pv.patient_id = :patient_id
+     ORDER BY pv.visit_date DESC, pv.id DESC'
 );
 $visitQuery->execute(['patient_id' => $patientId]);
 $visits = $visitQuery->fetchAll();
@@ -90,6 +101,14 @@ $visits = $visitQuery->fetchAll();
         .clinical-item.full { grid-column: 1 / -1; }
         .clinical-label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; color: #667085; text-transform: uppercase; letter-spacing: .04em; }
         .clinical-value { white-space: pre-wrap; line-height: 1.55; }
+        .void-box { margin-top: 14px; padding: 14px; border: 1px solid #fecdca; border-radius: 11px; background: #fef3f2; }
+        .void-meta { margin: 0 0 6px; font-size: 13px; font-weight: 800; color: #b42318; }
+        .void-reason { margin: 0; white-space: pre-wrap; line-height: 1.5; color: #7a271a; }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+        .action { display: inline-block; border: 0; cursor: pointer; padding: 8px 11px; border-radius: 8px; font: inherit; font-weight: 700; text-decoration: none; }
+        .action.edit { background: #f2f4f7; color: #344054; }
+        .action.void { background: #fff1f0; color: #b42318; }
+        .void-form { display: inline; margin: 0; }
         @media (max-width: 700px) {
             main { margin-top: 22px; }
             .titlebar, .visit-head { flex-direction: column; }
@@ -182,6 +201,44 @@ $visits = $visitQuery->fetchAll();
                                 <span class="clinical-label">Catatan Klinis</span>
                                 <div class="clinical-value"><?= htmlspecialchars((string) ($visit['notes'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></div>
                             </div>
+                        </div>
+
+                        <?php if ($visit['status'] === 'cancelled'): ?>
+                            <!-- =================================
+                                 DETAIL VOID
+                                 Histori void tetap ditampilkan agar
+                                 pembatalan dapat diaudit.
+                                 ================================= -->
+                            <div class="void-box">
+                                <p class="void-meta">
+                                    🚫 Dibatalkan
+                                    <?php if ($visit['voided_by_name']): ?>
+                                        oleh <?= htmlspecialchars((string) $visit['voided_by_name'], ENT_QUOTES, 'UTF-8') ?>
+                                    <?php endif; ?>
+                                    <?php if ($visit['voided_at']): ?>
+                                        pada <?= htmlspecialchars(date('d-m-Y H:i', strtotime((string) $visit['voided_at'])), ENT_QUOTES, 'UTF-8') ?>
+                                    <?php endif; ?>
+                                </p>
+                                <p class="void-reason">
+                                    Alasan: <?= htmlspecialchars((string) ($visit['void_reason'] ?: 'Tidak dicantumkan.'), ENT_QUOTES, 'UTF-8') ?>
+                                </p>
+                            </div>
+                        <?php endif; ?>
+
+                        <div class="actions">
+                            <?php if ($visit['status'] !== 'cancelled' && Auth::can('visits.update')): ?>
+                                <a class="action edit" href="/dashboard/patients/visit-edit.php?id=<?= (int) $visit['id'] ?>">Edit</a>
+                            <?php endif; ?>
+
+                            <?php if ($visit['status'] !== 'cancelled' && Auth::can('visits.void')): ?>
+                                <!-- Form POST digunakan agar void tidak dapat dipicu melalui GET. -->
+                                <form class="void-form" method="post" action="/dashboard/patients/visit-void.php" onsubmit="return confirm('⚠️ Batalkan kunjungan ini?\n\nRecord tidak akan dihapus, tetapi status kunjungan akan menjadi Cancelled.');">
+                                    <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($voidCsrfToken, ENT_QUOTES, 'UTF-8') ?>">
+                                    <input type="hidden" name="id" value="<?= (int) $visit['id'] ?>">
+                                    <input type="hidden" name="void_reason" value="Pembatalan kunjungan melalui riwayat pasien.">
+                                    <button class="action void" type="submit">Void</button>
+                                </form>
+                            <?php endif; ?>
                         </div>
                     </article>
                 <?php endforeach; ?>
