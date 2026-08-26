@@ -9,9 +9,9 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
 JOIN permissions p ON p.slug IN (
-    'users.view', 'users.create', 'users.update',
-    'patients.view', 'patients.create', 'patients.update',
-    'doctors.view', 'doctors.create', 'doctors.update',
+    'users.view', 'users.create', 'users.update', 'users.delete',
+    'patients.view', 'patients.create', 'patients.update', 'patients.delete',
+    'doctors.view', 'doctors.create', 'doctors.update', 'doctors.delete',
     'medical_records.view',
     'medicines.view',
     'queue.view', 'queue.create', 'queue.update',
