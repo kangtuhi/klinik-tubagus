@@ -7,6 +7,10 @@ require_once __DIR__ . '/Session.php';
 
 final class Auth
 {
+    // ============================================================
+    // PROSES LOGIN
+    // Memvalidasi identitas pengguna, status akun, dan kata sandi.
+    // ============================================================
     public static function attempt(string $identity, string $password): bool
     {
         Session::start();
@@ -49,11 +53,19 @@ final class Auth
         return true;
     }
 
+    // ============================================================
+    // CEK STATUS LOGIN
+    // Memastikan sesi pengguna masih terautentikasi.
+    // ============================================================
     public static function check(): bool
     {
         return Session::get('authenticated', false) === true;
     }
 
+    // ============================================================
+    // DATA PENGGUNA AKTIF
+    // Mengambil identitas pengguna yang sedang login dari sesi.
+    // ============================================================
     public static function user(): ?array
     {
         if (!self::check()) {
@@ -70,6 +82,11 @@ final class Auth
         ];
     }
 
+    // ============================================================
+    // CEK PERMISSION RBAC
+    // Permission aplikasi menggunakan kolom name sebagai identifier.
+    // Kolom slug tetap menjadi atribut database yang terpisah.
+    // ============================================================
     public static function can(string $permission): bool
     {
         if (!self::check()) {
@@ -87,7 +104,7 @@ final class Auth
              FROM role_permissions rp
              INNER JOIN permissions p ON p.id = rp.permission_id
              WHERE rp.role_id = :role_id
-               AND p.slug = :permission
+               AND p.name = :permission
              LIMIT 1'
         );
         $statement->execute([
@@ -98,6 +115,10 @@ final class Auth
         return (bool) $statement->fetchColumn();
     }
 
+    // ============================================================
+    // LOGOUT
+    // Menghapus seluruh data sesi pengguna.
+    // ============================================================
     public static function logout(): void
     {
         Session::destroy();
