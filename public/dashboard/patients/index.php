@@ -95,6 +95,7 @@ $patients = $statement->fetchAll();
         .action-link { font-weight: 700; text-decoration: none; }
         .action-link.danger { color: #b42318; }
         .action-link.success { color: #067647; }
+        .action-link.profile { color: #175cd3; }
         @media (max-width: 700px) {
             main { margin-top: 22px; }
             .titlebar { align-items: flex-start; flex-direction: column; }
@@ -186,18 +187,17 @@ $patients = $statement->fetchAll();
                             </span>
                         </td>
                         <td>
-                            <?php if (Auth::can('patients.update')): ?>
-                                <div class="actions">
+                            <div class="actions">
+                                <a class="action-link profile" href="/dashboard/patients/profile.php?id=<?= (int) $patient['id'] ?>">Profile</a>
+                                <?php if (Auth::can('patients.update')): ?>
                                     <a class="action-link" href="/dashboard/patients/edit.php?id=<?= (int) $patient['id'] ?>">Edit</a>
                                     <?php if ($patient['status'] === 'active'): ?>
                                         <a class="action-link danger" href="/dashboard/patients/status.php?id=<?= (int) $patient['id'] ?>">Deactivate</a>
                                     <?php else: ?>
                                         <a class="action-link success" href="/dashboard/patients/status.php?id=<?= (int) $patient['id'] ?>">Aktifkan</a>
                                     <?php endif; ?>
-                                </div>
-                            <?php else: ?>
-                                <span class="muted">—</span>
-                            <?php endif; ?>
+                                <?php endif; ?>
+                            </div>
                         </td>
                     </tr>
                 <?php endforeach; ?>
