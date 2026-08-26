@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../app/core/Database.php';
 require_once __DIR__ . '/../../../app/core/Session.php';
 require_once __DIR__ . '/../../../app/helpers/auth.php';
 require_once __DIR__ . '/../../../app/helpers/permission.php';
+require_once __DIR__ . '/../../../app/helpers/csrf.php';
 
 // ============================================================
 // GUARD AKSES VOID KUNJUNGAN
@@ -24,20 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 // ============================================================
 // VALIDASI CSRF
-// Token menggunakan session khusus agar aksi void terlindungi
-// dari request lintas situs yang tidak sah.
+// Gunakan helper CSRF bersama agar nama field dan token session
+// konsisten antara halaman histori dan endpoint void.
 // ============================================================
-if (!Session::has('csrf_patient_visit_void')) {
-    Session::set('csrf_patient_visit_void', bin2hex(random_bytes(32)));
-}
-
-$csrfToken = (string) Session::get('csrf_patient_visit_void');
-$postedToken = (string) ($_POST['csrf_token'] ?? '');
-
-if (!hash_equals($csrfToken, $postedToken)) {
-    http_response_code(403);
-    exit('Token keamanan tidak valid.');
-}
+verify_csrf();
 
 // ============================================================
 // VALIDASI ID KUNJUNGAN
