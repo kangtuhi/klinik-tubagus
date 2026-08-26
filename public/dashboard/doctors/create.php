@@ -17,6 +17,7 @@ require_permission('doctors.create');
 
 $pdo = Database::connection();
 $errors = [];
+$fieldErrors = [];
 
 // ============================================================
 // NILAI AWAL FORMULIR
@@ -49,40 +50,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ========================================================
     // VALIDASI INPUT SERVER-SIDE
-    // Memastikan data wajib dan format email valid sebelum masuk DB.
+    // Pesan disimpan per field agar UI dapat menampilkannya
+    // tepat di bawah input yang bermasalah.
     // ========================================================
     if ($form['full_name'] === '') {
-        $errors[] = 'Nama dokter wajib diisi.';
+        $fieldErrors['full_name'] = 'Nama dokter wajib diisi.';
     } elseif (mb_strlen($form['full_name']) > 150) {
-        $errors[] = 'Nama dokter maksimal 150 karakter.';
+        $fieldErrors['full_name'] = 'Maksimal 150 karakter.';
     }
 
     if ($form['sip_number'] !== '' && mb_strlen($form['sip_number']) > 100) {
-        $errors[] = 'SIP maksimal 100 karakter.';
+        $fieldErrors['sip_number'] = 'Maksimal 100 karakter.';
     }
 
     if ($form['str_number'] !== '' && mb_strlen($form['str_number']) > 100) {
-        $errors[] = 'STR maksimal 100 karakter.';
+        $fieldErrors['str_number'] = 'Maksimal 100 karakter.';
     }
 
     if ($form['specialty'] !== '' && mb_strlen($form['specialty']) > 100) {
-        $errors[] = 'Spesialisasi maksimal 100 karakter.';
+        $fieldErrors['specialty'] = 'Maksimal 100 karakter.';
     }
 
     if ($form['phone'] !== '' && mb_strlen($form['phone']) > 30) {
-        $errors[] = 'Nomor telepon maksimal 30 karakter.';
+        $fieldErrors['phone'] = 'Maksimal 30 karakter.';
     }
 
     if ($form['email'] !== '' && (!filter_var($form['email'], FILTER_VALIDATE_EMAIL) || mb_strlen($form['email']) > 191)) {
-        $errors[] = 'Format email dokter tidak valid.';
+        $fieldErrors['email'] = 'Format email tidak valid.';
     }
 
     // ========================================================
     // CEK DUPLIKAT SIP / STR
-    // Memberikan pesan yang lebih jelas daripada error constraint
-    // database ketika nomor profesional sudah digunakan.
+    // Menempatkan pesan langsung pada field terkait agar lebih
+    // ringkas dan premium daripada daftar error global.
     // ========================================================
-    if (!$errors && ($form['sip_number'] !== '' || $form['str_number'] !== '')) {
+    if (!$fieldErrors && ($form['sip_number'] !== '' || $form['str_number'] !== '')) {
         $duplicate = $pdo->prepare(
             'SELECT sip_number, str_number
              FROM doctors
@@ -100,15 +102,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($existing) {
             if ($form['sip_number'] !== '' && $existing['sip_number'] === $form['sip_number']) {
-                $errors[] = 'Nomor SIP sudah terdaftar.';
+                $fieldErrors['sip_number'] = 'Nomor SIP sudah terdaftar.';
             }
             if ($form['str_number'] !== '' && $existing['str_number'] === $form['str_number']) {
-                $errors[] = 'Nomor STR sudah terdaftar.';
+                $fieldErrors['str_number'] = 'Nomor STR sudah terdaftar.';
             }
         }
     }
 
-    if (!$errors) {
+    if (!$fieldErrors) {
         // ====================================================
         // SIMPAN DOKTER BARU
         // Status awal selalu active agar dokter siap digunakan.
@@ -148,8 +150,9 @@ $csrfToken = csrf_token();
         label { font-weight: 700; font-size: 14px; }
         input { width: 100%; padding: 11px 12px; border: 1px solid #d0d5dd; border-radius: 10px; font: inherit; }
         input:focus { outline: 2px solid rgba(20,108,67,.15); border-color: #146c43; }
+        input.is-invalid { border-color: #d92d20; }
         .hint { color: #667085; font-size: 12px; }
-        .errors { margin-bottom: 20px; padding: 13px 16px; border-radius: 12px; background: #fff1f0; color: #b42318; }
+        .field-error { color: #b42318; font-size: 12px; line-height: 1.4; margin-top: -2px; }
         .actions { display: flex; gap: 10px; margin-top: 24px; }
         .button { display: inline-block; border: 0; padding: 11px 15px; border-radius: 10px; background: #146c43; color: #fff; text-decoration: none; font: inherit; font-weight: 700; cursor: pointer; }
         .button.secondary { background: #f2f4f7; color: #344054; }
@@ -164,51 +167,44 @@ $csrfToken = csrf_token();
         <h1>🩺 Tambah Dokter</h1>
         <p class="subtitle">Tambahkan data profesional dokter ke Klinik Tubagus.</p>
 
-        <?php if ($errors): ?>
-            <div class="errors" role="alert">
-                <strong>Periksa kembali data berikut:</strong>
-                <ul>
-                    <?php foreach ($errors as $error): ?>
-                        <li><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></li>
-                    <?php endforeach; ?>
-                </ul>
-            </div>
-        <?php endif; ?>
-
         <form method="post" novalidate>
             <input type="hidden" name="_csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
 
             <div class="grid">
                 <div class="field full">
                     <label for="full_name">Nama Dokter *</label>
-                    <input id="full_name" name="full_name" type="text" maxlength="150" required value="<?= htmlspecialchars($form['full_name'], ENT_QUOTES, 'UTF-8') ?>">
+                    <input class="<?= isset($fieldErrors['full_name']) ? 'is-invalid' : '' ?>" id="full_name" name="full_name" type="text" maxlength="150" required aria-invalid="<?= isset($fieldErrors['full_name']) ? 'true' : 'false' ?>" value="<?= htmlspecialchars($form['full_name'], ENT_QUOTES, 'UTF-8') ?>">
+                    <?php if (isset($fieldErrors['full_name'])): ?><span class="field-error"><?= htmlspecialchars($fieldErrors['full_name'], ENT_QUOTES, 'UTF-8') ?></span><?php endif; ?>
                 </div>
 
                 <div class="field">
                     <label for="sip_number">Nomor SIP</label>
-                    <input id="sip_number" name="sip_number" type="text" maxlength="100" value="<?= htmlspecialchars($form['sip_number'], ENT_QUOTES, 'UTF-8') ?>">
-                    <span class="hint">Nomor SIP harus unik.</span>
+                    <input class="<?= isset($fieldErrors['sip_number']) ? 'is-invalid' : '' ?>" id="sip_number" name="sip_number" type="text" maxlength="100" aria-invalid="<?= isset($fieldErrors['sip_number']) ? 'true' : 'false' ?>" value="<?= htmlspecialchars($form['sip_number'], ENT_QUOTES, 'UTF-8') ?>">
+                    <?php if (isset($fieldErrors['sip_number'])): ?><span class="field-error"><?= htmlspecialchars($fieldErrors['sip_number'], ENT_QUOTES, 'UTF-8') ?></span><?php else: ?><span class="hint">Nomor SIP harus unik.</span><?php endif; ?>
                 </div>
 
                 <div class="field">
                     <label for="str_number">Nomor STR</label>
-                    <input id="str_number" name="str_number" type="text" maxlength="100" value="<?= htmlspecialchars($form['str_number'], ENT_QUOTES, 'UTF-8') ?>">
-                    <span class="hint">Nomor STR harus unik.</span>
+                    <input class="<?= isset($fieldErrors['str_number']) ? 'is-invalid' : '' ?>" id="str_number" name="str_number" type="text" maxlength="100" aria-invalid="<?= isset($fieldErrors['str_number']) ? 'true' : 'false' ?>" value="<?= htmlspecialchars($form['str_number'], ENT_QUOTES, 'UTF-8') ?>">
+                    <?php if (isset($fieldErrors['str_number'])): ?><span class="field-error"><?= htmlspecialchars($fieldErrors['str_number'], ENT_QUOTES, 'UTF-8') ?></span><?php else: ?><span class="hint">Nomor STR harus unik.</span><?php endif; ?>
                 </div>
 
                 <div class="field">
                     <label for="specialty">Spesialisasi</label>
-                    <input id="specialty" name="specialty" type="text" maxlength="100" value="<?= htmlspecialchars($form['specialty'], ENT_QUOTES, 'UTF-8') ?>">
+                    <input class="<?= isset($fieldErrors['specialty']) ? 'is-invalid' : '' ?>" id="specialty" name="specialty" type="text" maxlength="100" aria-invalid="<?= isset($fieldErrors['specialty']) ? 'true' : 'false' ?>" value="<?= htmlspecialchars($form['specialty'], ENT_QUOTES, 'UTF-8') ?>">
+                    <?php if (isset($fieldErrors['specialty'])): ?><span class="field-error"><?= htmlspecialchars($fieldErrors['specialty'], ENT_QUOTES, 'UTF-8') ?></span><?php endif; ?>
                 </div>
 
                 <div class="field">
                     <label for="phone">Telepon</label>
-                    <input id="phone" name="phone" type="text" maxlength="30" value="<?= htmlspecialchars($form['phone'], ENT_QUOTES, 'UTF-8') ?>">
+                    <input class="<?= isset($fieldErrors['phone']) ? 'is-invalid' : '' ?>" id="phone" name="phone" type="text" maxlength="30" aria-invalid="<?= isset($fieldErrors['phone']) ? 'true' : 'false' ?>" value="<?= htmlspecialchars($form['phone'], ENT_QUOTES, 'UTF-8') ?>">
+                    <?php if (isset($fieldErrors['phone'])): ?><span class="field-error"><?= htmlspecialchars($fieldErrors['phone'], ENT_QUOTES, 'UTF-8') ?></span><?php endif; ?>
                 </div>
 
                 <div class="field full">
                     <label for="email">Email</label>
-                    <input id="email" name="email" type="email" maxlength="191" value="<?= htmlspecialchars($form['email'], ENT_QUOTES, 'UTF-8') ?>">
+                    <input class="<?= isset($fieldErrors['email']) ? 'is-invalid' : '' ?>" id="email" name="email" type="email" maxlength="191" aria-invalid="<?= isset($fieldErrors['email']) ? 'true' : 'false' ?>" value="<?= htmlspecialchars($form['email'], ENT_QUOTES, 'UTF-8') ?>">
+                    <?php if (isset($fieldErrors['email'])): ?><span class="field-error"><?= htmlspecialchars($fieldErrors['email'], ENT_QUOTES, 'UTF-8') ?></span><?php endif; ?>
                 </div>
             </div>
 
