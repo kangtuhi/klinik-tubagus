@@ -45,10 +45,10 @@ if (!$patient) {
 
 // ============================================================
 // TOKEN CSRF VOID
-// Token dibuat di halaman yang menampilkan form POST void agar
-// endpoint void menerima token yang sama dari session.
+// Gunakan helper CSRF bersama agar token form dan endpoint void
+// memakai session token yang sama.
 // ============================================================
-$voidCsrfToken = csrf_token('patient_visit_void');
+$voidCsrfToken = csrf_token();
 
 // ============================================================
 // AMBIL RIWAYAT KUNJUNGAN
