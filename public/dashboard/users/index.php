@@ -84,12 +84,18 @@ $csrf = csrf_token();
                     <tr>
                         <td><?= (int) $user['id'] ?></td>
                         <td class="<?= $user['role_slug'] === 'owner' ? 'owner' : '' ?>">
-                            <?= htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8') ?><?= $user['role_slug'] === 'owner' ? ' 👑' : '' ?>
+                            <?= htmlspecialchars((string) ($user['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?><?= $user['role_slug'] === 'owner' ? ' 👑' : '' ?>
                         </td>
-                        <td><?= htmlspecialchars($user['username'], ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($user['role_name'], ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><span class="badge <?= htmlspecialchars($user['status'], ENT_QUOTES, 'UTF-8') ?>"><?= strtoupper(htmlspecialchars($user['status'], ENT_QUOTES, 'UTF-8')) ?></span></td>
+                        <td><?= htmlspecialchars((string) ($user['username'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                        <td>
+                            <?php if ($user['email'] === null || trim((string) $user['email']) === ''): ?>
+                                <span class="muted">— Tidak menggunakan email —</span>
+                            <?php else: ?>
+                                <?= htmlspecialchars((string) $user['email'], ENT_QUOTES, 'UTF-8') ?>
+                            <?php endif; ?>
+                        </td>
+                        <td><?= htmlspecialchars((string) ($user['role_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                        <td><span class="badge <?= htmlspecialchars((string) ($user['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?= strtoupper(htmlspecialchars((string) ($user['status'] ?? ''), ENT_QUOTES, 'UTF-8')) ?></span></td>
                         <td>
                             <?php if ($user['role_slug'] === 'owner' || $isCurrent): ?>
                                 <span class="muted"><?= $user['role_slug'] === 'owner' ? 'Owner utama' : 'Akun sendiri' ?></span>
